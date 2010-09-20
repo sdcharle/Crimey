@@ -118,7 +118,7 @@ class GoofDB:
 
     def storeCoords(self, lat, long, place, url):
         try:
-            self.conn.execute("update incident set update_time = datetime('now'), geocode_attempt = 1, lat=?, long=?, geocoded_place=? where url=?",(lat,long, place, url))
+            self.conn.execute("update incident set update_time = datetime('now'), geocode_attempt = 1, failed_geocoding = 0; lat=?, long=?, geocoded_place=? where url=?",(lat,long, place, url))
             self.conn.commit()
         except Exception, val:
             logger.error("fuck up in store coords: %s, %s" % (Exception, val)) 
@@ -126,7 +126,6 @@ class GoofDB:
     
     def saveContents(self, contents):
         success = True
-        #print str(contents)
         try:
             self.conn.execute("""insert into incident (url, incident_type, district, incident_date, 
                               address, summary, update_time, fixed_incident_date) values (?,?,?,?,?,?,?,?)""" , (contents['url'], contents['incident type'], contents['district'],
@@ -141,7 +140,10 @@ class GoofDB:
     def getUnattemptedAddressURLs(self):
         urls = []
         try:
-            for row in self.conn.execute("select url,address from incident where geocode_attempt=0"):
+            for row in self.conn.execute("""
+                        select url,address from incident where geocode_attempt=0
+                        or failed_geocoding is null
+                        """):
                 urls.append(row)
         except Exception, val:
             logger.error("fuck up in get no address vals: %s, %s" % (Exception, val))
@@ -307,7 +309,20 @@ def scrape_to_db(goofy):
       except Exception, val:
         logger.error("%s: %s, %s"%(file, Exception, val))
         
-        
+# modified 9/18/2010, now return a set to try.
+def clean_addresses(address):
+    print "raw address: %s\n" % address
+    addresses = []
+    address = address.lower()
+    address = address.replace('blk','')
+    if address.find('/') > 0:
+        addresses.append(address.replace('/',' and ') + " Bloomington, IN")
+        addresses.append(address.split('/')[0] + " Bloomington, IN")
+    else:
+        address = address + " Bloomington, IN"
+        addresses = [address,]
+    return addresses
+         
 # get the coords...
 def geo_main(goofDB, geo):
     addRows = goofDB.getUnattemptedAddressURLs()
@@ -315,17 +330,27 @@ def geo_main(goofDB, geo):
     for row in addRows:
         lat = 0
         lng = 0
-        try:
-            place, (lat, lng) = geo.geocode(clean_address(row[1]))
-            goofDB.storeCoords( lat, lng, place, row[0])
-            print "succeed on: %s" % row[0]
-        except Exception, val:
-            logger.error("Fail on %s, %s, %s" %(row[0], Exception, val))
-        count += 1
+
+        # address attempts - / -> &. or drop stuff after the and
+        addresses = clean_addresses(row[1])
+        print "%s\n" % addresses
+        for addr in addresses:
+            print "go for: %s\n" % addr
+            try:
+                place, (lat, lng) = geo.geocode(addr)
+                goofDB.storeCoords( lat, lng, place, row[0])
+                print "%s: %s,%s %s\n" %(place, lat, lng, addr) 
+                count += 1
+                print "succeed on: %s" % addr
+                break
+            except Exception, val:
+                logger.error("Fail on %s, %s, %s" %(row[0], Exception, val))
+
         if count == 1500:
             break
         
     print "processed %i records." % count
+      
        
        
 """
