@@ -83,7 +83,7 @@ DATE_PATTERN = "%m/%d/%y"
 DATE_TIME_PATTERN = DATE_PATTERN + "    %I:%M:S %p"
 DATABASE_FILE = "./crimey.db"
 DATERE =  re.compile(r'\/(\d+)\/(\d+)\/(\d+)')
-GMAPS_API_KEY = "ABQIAAAAsN3dUjp7Qu90aAfa3r-eHxT2yXp_ZAY8_ufC3CFXhHIE1NvwkxRyosXyGpE39F8_XJV0vYxDyNHEJw"
+GMAPS_API_KEY = "getyourowndamnkey"
 
 URL_SKIP_PATTERNS = ['sex-offender']
 
